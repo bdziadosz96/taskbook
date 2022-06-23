@@ -42,7 +42,7 @@ import pl.bookstore.app.views.MainLayout;
 @PageTitle("Hello World")
 @Route(value = "hello/:sampleBookID?/:action?(edit)", layout = MainLayout.class)
 @RouteAlias(value = "", layout = MainLayout.class)
-public class HelloWorldView extends Div implements BeforeEnterObserver {
+public class BookApplicationView extends Div implements BeforeEnterObserver {
 
     private final String SAMPLEBOOK_ID = "sampleBookID";
     private final String SAMPLEBOOK_EDIT_ROUTE_TEMPLATE = "hello/%s/edit";
@@ -59,6 +59,7 @@ public class HelloWorldView extends Div implements BeforeEnterObserver {
 
     private Button cancel = new Button("Cancel");
     private Button save = new Button("Save");
+    private Button delete = new Button("Delete");
 
     private BeanValidationBinder<SampleBook> binder;
 
@@ -67,11 +68,10 @@ public class HelloWorldView extends Div implements BeforeEnterObserver {
     private final SampleBookService sampleBookService;
 
     @Autowired
-    public HelloWorldView(SampleBookService sampleBookService) {
+    public BookApplicationView(SampleBookService sampleBookService) {
         this.sampleBookService = sampleBookService;
         addClassNames("hello-world-view");
 
-        // Create UI
         SplitLayout splitLayout = new SplitLayout();
 
         createGridLayout(splitLayout);
@@ -79,12 +79,12 @@ public class HelloWorldView extends Div implements BeforeEnterObserver {
 
         add(splitLayout);
 
-        // Configure Grid
         LitRenderer<SampleBook> imageRenderer = LitRenderer
                 .<SampleBook>of("<img style='height: 64px' src=${item.image} />")
                 .withProperty("image", SampleBook::getImage);
         grid.addColumn(imageRenderer).setHeader("Image").setWidth("68px").setFlexGrow(0);
 
+        grid.setItems(sampleBookService.findAll());
         grid.addColumn("name").setAutoWidth(true);
         grid.addColumn("author").setAutoWidth(true);
         grid.addColumn("publicationDate").setAutoWidth(true);
@@ -95,20 +95,17 @@ public class HelloWorldView extends Div implements BeforeEnterObserver {
                 .stream());
         grid.addThemeVariants(GridVariant.LUMO_NO_BORDER);
 
-        // when a row is selected or deselected, populate form
         grid.asSingleSelect().addValueChangeListener(event -> {
             if (event.getValue() != null) {
                 UI.getCurrent().navigate(String.format(SAMPLEBOOK_EDIT_ROUTE_TEMPLATE, event.getValue().getId()));
             } else {
                 clearForm();
-                UI.getCurrent().navigate(HelloWorldView.class);
+                UI.getCurrent().navigate(BookApplicationView.class);
             }
         });
 
-        // Configure Form
         binder = new BeanValidationBinder<>(SampleBook.class);
 
-        // Bind fields. This is where you'd define e.g. validation rules
         binder.forField(pages).withConverter(new StringToIntegerConverter("Only numbers are allowed")).bind("pages");
 
         binder.bindInstanceFields(this);
@@ -132,10 +129,16 @@ public class HelloWorldView extends Div implements BeforeEnterObserver {
                 clearForm();
                 refreshGrid();
                 Notification.show("SampleBook details stored.");
-                UI.getCurrent().navigate(HelloWorldView.class);
+                UI.getCurrent().navigate(BookApplicationView.class);
             } catch (ValidationException validationException) {
                 Notification.show("An exception happened while trying to store the sampleBook details.");
             }
+        });
+
+        delete.addClickListener(e -> {
+            sampleBookService.delete(sampleBook.getId());
+            clearForm();
+            refreshGrid();
         });
 
     }
@@ -150,10 +153,8 @@ public class HelloWorldView extends Div implements BeforeEnterObserver {
             } else {
                 Notification.show(String.format("The requested sampleBook was not found, ID = %s", sampleBookId.get()),
                         3000, Notification.Position.BOTTOM_START);
-                // when a row is selected but the data is no longer available,
-                // refresh grid
                 refreshGrid();
-                event.forwardTo(HelloWorldView.class);
+                event.forwardTo(BookApplicationView.class);
             }
         }
     }
@@ -192,7 +193,8 @@ public class HelloWorldView extends Div implements BeforeEnterObserver {
         buttonLayout.setClassName("button-layout");
         cancel.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
         save.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-        buttonLayout.add(save, cancel);
+        delete.addThemeVariants(ButtonVariant.LUMO_ERROR);
+        buttonLayout.add(save, cancel, delete);
         editorLayoutDiv.add(buttonLayout);
     }
 
